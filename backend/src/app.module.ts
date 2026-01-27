@@ -1,25 +1,15 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ParkingLotModule } from './parking_lot/parking_lot.module';
-import { ParkingLot } from './parking_lot/entities/parking_lot.entity';
+import { EventsModule } from './events/events.module';
+import { FirebaseModule } from './firebase/firebase.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: 'rebon123',
-      database: 'mmu_parking_db',
-      entities: [ParkingLot],
-      synchronize: true,
-    }),
-    ParkingLotModule,
+    FirebaseModule, // Global - provides FirebaseService to all modules
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
