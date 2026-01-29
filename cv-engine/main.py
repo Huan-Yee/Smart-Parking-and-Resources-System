@@ -1,6 +1,7 @@
 import cv2
 import time
 import requests
+import numpy as np
 import config
 
 def main():
@@ -8,32 +9,72 @@ def main():
     print(f"Connecting to Camera: {config.CAMERA_SOURCE}")
     print(f"Backend URL: {config.BACKEND_URL}")
 
-    # Initialize Video Capture (Webcam, File, or IP Stream)
-    # If CAMERA_SOURCE is a digit (e.g. "0"), convert to int for USB camera
+    # Initialize Video Capture
     source = int(config.CAMERA_SOURCE) if config.CAMERA_SOURCE.isdigit() else config.CAMERA_SOURCE
-    cap = cv2.VideoCapture(source)
+    
+    if isinstance(source, int):
+        # Force DirectShow on Windows to resolve access errors (-1072875772)
+        cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
+    else:
+        # IP Camera or File
+        cap = cv2.VideoCapture(source)
 
     if not cap.isOpened():
         print("Error: Could not open video source.")
         return
+
+    # Background Subtractor for Motion Detection
+    fgbg = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=True)
+    
+    # Cooldown to prevent spamming the API
+    last_trigger_time = 0
+    TRIGGER_COOLDOWN = 10  # Seconds between entries
 
     print("Video stream started. Press 'q' to quit.")
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Failed to grab frame. Exiting or Retrying...")
-            break
+            # If reading from a file, loop back to start
+            if isinstance(source, str) and not source.startswith('http'):
+                print("End of video file. Looping...")
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+            else:
+                print("Failed to grab frame. Retrying...")
+                break
 
-        # --- TODO: Place Detection Logic Here ---
-        # 1. Detect License Plate
-        # 2. Recognize Text (OCR)
-        # 3. If new plate found -> trigger_entry_event(plate_text)
+        # 1. Apply Background Subtraction
+        fgmask = fgbg.apply(frame)
+
+        # 2. Remove noise (Shadows/Small dots)
+        _, fgmask = cv2.threshold(fgmask, 244, 255, cv2.THRESH_BINARY)
         
-        # Display the stream for debugging
-        cv2.imshow('Smart Parking CV View', frame)
+        # 3. Find Contours (Shapes of moving objects)
+        contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Press 'q' to exit
+        vehicle_detected = False
+        
+        for contour in contours:
+            # Filter small movements (leaves, wind)
+            if cv2.contourArea(contour) > 2000:
+                # Draw bounding box around vehicle
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                vehicle_detected = True
+
+        # 4. Trigger Event if Vehicle Detected AND Cooldown passed
+        if vehicle_detected:
+            current_time = time.time()
+            if current_time - last_trigger_time > TRIGGER_COOLDOWN:
+                print(f"[ACTION] Vehicle Detected! Triggering Entry...")
+                trigger_entry_event("DETECTED_CAR")
+                last_trigger_time = current_time
+
+        # Display the streams
+        cv2.imshow('Smart Parking Live', frame)
+        cv2.imshow('Motion Mask', fgmask)
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
