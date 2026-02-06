@@ -29,6 +29,9 @@ def main():
     # Cooldown to prevent spamming the API
     last_trigger_time = 0
     TRIGGER_COOLDOWN = 10  # Seconds between entries
+    
+    # Detection settings (tune these during deployment)
+    MIN_CONTOUR_AREA = 2000  # Minimum area to trigger detection
 
     print("Video stream started. Press 'q' to quit.")
 
@@ -42,7 +45,8 @@ def main():
                 continue
             else:
                 print("Failed to grab frame. Retrying...")
-                break
+                time.sleep(1)
+                continue
 
         # 1. Apply Background Subtraction
         fgmask = fgbg.apply(frame)
@@ -57,8 +61,8 @@ def main():
         
         for contour in contours:
             # Filter small movements (leaves, wind)
-            if cv2.contourArea(contour) > 2000:
-                # Draw bounding box around vehicle
+            if cv2.contourArea(contour) > MIN_CONTOUR_AREA:
+                # Draw bounding box around detected object
                 x, y, w, h = cv2.boundingRect(contour)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 vehicle_detected = True

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- MMU Logo - Simplified version -->
+  <!-- Blue arc with hands -->
+  <circle cx="25" cy="30" r="20" fill="#1e4b8e"/>
+  <circle cx="25" cy="30" r="8" fill="white"/>
+  <circle cx="25" cy="30" r="4" fill="#c41e3a"/>
+  
+  <!-- MMU Text -->
+  <text x="55" y="40" font-family="Arial Black, sans-serif" font-size="32" font-weight="bold" fill="#1e1e1e">MMU</text>
+  
+  <!-- Multimedia University text -->
+  <text x="55" y="55" font-family="Arial, sans-serif" font-size="8" letter-spacing="2" fill="#1e1e1e">MULTIMEDIA UNIVERSITY</text>
+</svg>

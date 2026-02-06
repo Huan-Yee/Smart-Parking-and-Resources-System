@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { doc, onSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
+// Default configuration for MMU Staff Parking
+const TOTAL_CAPACITY = 30;
+
 export interface ParkingStats {
     totalCapacity: number;
     currentOccupied: number;
@@ -30,18 +33,22 @@ export function useParkingStats() {
             (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data() as DocumentData;
+                    // Backend writes 'occupied' field
+                    const occupied = data.occupied || 0;
+                    const total = data.totalCapacity || TOTAL_CAPACITY;
+
                     setStats({
-                        totalCapacity: data.totalCapacity || 100,
-                        currentOccupied: data.currentOccupied || 0,
-                        availableSlots: data.availableSlots || data.totalCapacity || 100,
+                        totalCapacity: total,
+                        currentOccupied: occupied,
+                        availableSlots: Math.max(0, total - occupied),
                         lastUpdated: data.lastUpdated?.toDate?.()?.toISOString() || new Date().toISOString(),
                     });
                 } else {
                     // Document doesn't exist yet - use defaults
                     setStats({
-                        totalCapacity: 100,
+                        totalCapacity: TOTAL_CAPACITY,
                         currentOccupied: 0,
-                        availableSlots: 100,
+                        availableSlots: TOTAL_CAPACITY,
                         lastUpdated: new Date().toISOString(),
                     });
                 }
