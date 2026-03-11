@@ -12,12 +12,8 @@ def main():
     # Initialize Video Capture
     source = int(config.CAMERA_SOURCE) if config.CAMERA_SOURCE.isdigit() else config.CAMERA_SOURCE
     
-    if isinstance(source, int):
-        # Force DirectShow on Windows to resolve access errors (-1072875772)
-        cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
-    else:
-        # IP Camera or File
-        cap = cv2.VideoCapture(source)
+    # IP Camera, USB WebCam, or File
+    cap = cv2.VideoCapture(source)
 
     if not cap.isOpened():
         print("Error: Could not open video source.")
