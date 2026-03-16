@@ -31,6 +31,17 @@
 $ npm install
 ```
 
+## Firebase Database Setup (Required)
+
+To run this backend locally, you must provide your own Firebase Service Account key. **Do not commit this key to version control.**
+
+1. Go to your [Firebase Console](https://console.firebase.google.com/).
+2. Navigate to **Project Settings > Service Accounts**.
+3. Click **Generate New Private Key**.
+4. Save the downloaded JSON file in the root of the `/backend` directory and name it exactly: `firebase-service-account.json`.
+
+*(Note: The `.gitignore` file is configured to ignore `firebase-service-account.json` to keep your credentials secure).*
+
 ## Compile and run the project
 
 ```bash
