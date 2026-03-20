@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CreateEventDto } from './dto/create-event.dto';
+import { SetCountDto } from './dto/set-count.dto';
 import { FirebaseService } from '../firebase/firebase.service';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -26,12 +27,14 @@ export class EventsService {
     }
 
     try {
-      // 1. Log the event
+      // 1. Log the event (use DTO fields with sensible defaults)
       await db.collection('events').add({
         type: 'entry',
         licensePlate: createEventDto.licensePlate,
-        timestamp: new Date(),
-        zoneId: 'gate-main',
+        timestamp: createEventDto.timestamp
+          ? new Date(createEventDto.timestamp)
+          : new Date(),
+        zoneId: createEventDto.zoneId || 'gate-main',
       });
 
       // 2. Update live count (increment occupied)
@@ -73,12 +76,14 @@ export class EventsService {
     }
 
     try {
-      // 1. Log the event
+      // 1. Log the event (use DTO fields with sensible defaults)
       await db.collection('events').add({
         type: 'exit',
         licensePlate: createEventDto.licensePlate,
-        timestamp: new Date(),
-        zoneId: 'gate-main',
+        timestamp: createEventDto.timestamp
+          ? new Date(createEventDto.timestamp)
+          : new Date(),
+        zoneId: createEventDto.zoneId || 'gate-main',
       });
 
       // 2. Update live count (decrement occupied, min 0)
@@ -177,9 +182,10 @@ export class EventsService {
   }
 
   /**
-   * Reset occupancy count to 0 (Admin action)
+   * Admin: Manually set the occupied count to a specific number.
+   * Useful when the automatic CV count drifts due to ESP32-CAM hardware limitations.
    */
-  async resetCount() {
+  async setCount(dto: SetCountDto) {
     const db = this.firebaseService.getFirestore();
 
     if (!db) {
@@ -188,16 +194,23 @@ export class EventsService {
 
     try {
       const statsRef = db.collection('live_counts').doc('summary');
-      await statsRef.set({
-        occupied: 0,
-        lastUpdated: new Date(),
-      }, { merge: true });
+      await statsRef.set(
+        {
+          occupied: dto.occupied,
+          lastUpdated: new Date(),
+        },
+        { merge: true },
+      );
 
-      this.logger.log('Occupancy count reset to 0');
-      return { status: 'success', message: 'Count reset to 0' };
+      this.logger.log(`Admin manually set occupied count to: ${dto.occupied}`);
+      return {
+        status: 'success',
+        message: `Occupied count set to ${dto.occupied}`,
+        occupied: dto.occupied,
+      };
     } catch (error) {
-      this.logger.error('Failed to reset count', error);
-      return { status: 'error', message: 'Failed to reset' };
+      this.logger.error('Failed to set count', error);
+      return { status: 'error', message: 'Failed to set count' };
     }
   }
 }

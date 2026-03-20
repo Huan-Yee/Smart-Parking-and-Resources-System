@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { EventsService } from './events/events.service';
+import { SetCountDto } from './events/dto/set-count.dto';
 
 @Controller()
 export class AppController {
@@ -52,7 +53,7 @@ export class AppController {
         <tr><td>GET</td><td><a href="/events/history">/events/history</a></td><td>Recent events</td></tr>
         <tr><td>POST</td><td>/events/entry</td><td>Record entry (CV Engine)</td></tr>
         <tr><td>POST</td><td>/events/exit</td><td>Record exit (CV Engine)</td></tr>
-        <tr><td>POST</td><td>/admin/reset</td><td>Reset count to 0</td></tr>
+        <tr><td>POST</td><td>/admin/set-count</td><td>Set occupied count (Admin)</td></tr>
     </table>
 
     <h2>📋 Recent Events (Last 10)</h2>
@@ -71,15 +72,28 @@ export class AppController {
 
     <h2>⚡ Actions</h2>
     <button class="refresh" onclick="location.reload()">🔄 Refresh</button>
-    <button class="reset" onclick="resetCount()">🔃 Reset Count to 0</button>
+    <div style="margin-top: 10px;">
+        <label>Set occupied count: </label>
+        <input type="number" id="countInput" min="0" max="30" value="0" style="width: 60px; padding: 6px;">
+        <button class="reset" onclick="setCount()">📝 Set Count</button>
+    </div>
 
     <hr>
     <p>Frontend Dashboard: <a href="http://localhost:3000/dashboard">localhost:3000/dashboard</a></p>
 
     <script>
-        async function resetCount() {
-            if (!confirm('Reset occupancy count to 0?')) return;
-            const res = await fetch('/admin/reset', { method: 'POST' });
+        async function setCount() {
+            const count = parseInt(document.getElementById('countInput').value);
+            if (isNaN(count) || count < 0 || count > 30) {
+                alert('Please enter a number between 0 and 30');
+                return;
+            }
+            if (!confirm('Set occupied count to ' + count + '?')) return;
+            const res = await fetch('/admin/set-count', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ occupied: count }),
+            });
             const data = await res.json();
             alert(data.message || 'Done');
             location.reload();
@@ -93,10 +107,10 @@ export class AppController {
     }
 
     /**
-     * Reset occupancy count to 0
+     * Admin: Manually set the occupancy count
      */
-    @Post('admin/reset')
-    async resetCount() {
-        return this.eventsService.resetCount();
+    @Post('admin/set-count')
+    async setCount(@Body() setCountDto: SetCountDto) {
+        return this.eventsService.setCount(setCountDto);
     }
 }
