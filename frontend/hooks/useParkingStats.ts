@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { doc, onSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-// Default configuration for MMU Staff Parking
-const TOTAL_CAPACITY = 30;
+const UI_TOTAL_CAPACITY = 40; // Forced to 40 for the 2-Zone (20 slots each) PC Layout UX
 
 export interface ParkingStats {
     totalCapacity: number;
@@ -12,43 +11,33 @@ export interface ParkingStats {
     lastUpdated: string;
 }
 
-/**
- * Custom Hook: useParkingStats
- * 
- * Subscribes to real-time updates from Firestore's live_counts/summary document.
- * Returns the current parking statistics and loading state.
- */
 export function useParkingStats() {
     const [stats, setStats] = useState<ParkingStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Reference to the live_counts/summary document
         const docRef = doc(db, 'live_counts', 'summary');
 
-        // Subscribe to real-time updates
         const unsubscribe = onSnapshot(
             docRef,
             (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data() as DocumentData;
-                    // Backend writes 'occupied' field
                     const occupied = data.occupied || 0;
-                    const total = data.totalCapacity || TOTAL_CAPACITY;
 
                     setStats({
-                        totalCapacity: total,
+                        totalCapacity: UI_TOTAL_CAPACITY,
                         currentOccupied: occupied,
-                        availableSlots: Math.max(0, total - occupied),
+                        // Overriding the backend's default 30-slot capacity so the Header matches the new 40-slot UI
+                        availableSlots: Math.max(0, UI_TOTAL_CAPACITY - occupied),
                         lastUpdated: data.lastUpdated?.toDate?.()?.toISOString() || new Date().toISOString(),
                     });
                 } else {
-                    // Document doesn't exist yet - use defaults
                     setStats({
-                        totalCapacity: TOTAL_CAPACITY,
+                        totalCapacity: UI_TOTAL_CAPACITY,
                         currentOccupied: 0,
-                        availableSlots: TOTAL_CAPACITY,
+                        availableSlots: UI_TOTAL_CAPACITY,
                         lastUpdated: new Date().toISOString(),
                     });
                 }
@@ -61,7 +50,6 @@ export function useParkingStats() {
             }
         );
 
-        // Cleanup subscription on unmount
         return () => unsubscribe();
     }, []);
 
