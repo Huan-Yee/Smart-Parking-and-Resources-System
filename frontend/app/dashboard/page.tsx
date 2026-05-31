@@ -1,99 +1,94 @@
 'use client';
 
-import { useState } from 'react';
 import { useParkingStats } from '../../hooks/useParkingStats';
+import { useRecentEvents } from '../../hooks/useRecentEvents';
 import DashboardHeader from './components/DashboardHeader';
-import ZoneSelector from './components/ZoneSelector';
-import ParkingGrid from './components/ParkingGrid';
-import ParkingMap from './components/ParkingMap';
-import { PARKING_ZONES } from './config/zones';
+import SummaryCards from './components/SummaryCards';
+import OccupancyGrid from './components/OccupancyGrid';
+import ManualCorrection from './components/ManualCorrection';
+import RecentEvents from './components/RecentEvents';
+import PrototypeInfo from './components/PrototypeInfo';
 
 export default function DashboardPage() {
-    const { stats, loading, error } = useParkingStats();
+  const { stats, loading, error } = useParkingStats();
+  const { events, loading: eventsLoading, error: eventsError, refetch: refetchEvents } = useRecentEvents(8);
 
-    // The Master Canvas Orchestrator states
-    const [selectedZoneId, setSelectedZoneId] = useState<string>(PARKING_ZONES[0].id);
-    const [isMapView, setIsMapView] = useState<boolean>(false);
-    
-    // Safety fallback mathematically if stats haven't loaded
-    const safeTotal = stats ? stats.totalCapacity : 40;
-    const safeAvailable = stats ? stats.availableSlots : 40;
-    const safeOccupied = stats ? stats.currentOccupied : 0;
-
-    // Dynamically merge the static abstract database (PARKING_ZONES) 
-    const systemZones = PARKING_ZONES.map(zone => ({
-        ...zone,
-        totalCapacity: zone.isActive ? safeTotal : zone.physicalCapacity,
-        available: zone.isActive ? safeAvailable : zone.physicalCapacity,
-    }));
-
-    const activeZoneData = systemZones.filter(z => z.id === selectedZoneId);
-    const activeZone = activeZoneData[0];
-
-    // Handle view routing elegantly
-    const handleViewMap = () => setIsMapView(true);
-    const handleBackToDashboard = () => setIsMapView(false);
-
-    if (error) {
-        return (
-            <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="bg-white border border-[#c41e3a] p-6 rounded-2xl shadow-md max-w-md w-full text-center">
-                    <h2 className="text-[#c41e3a] text-xl font-bold mb-2">Connection Error</h2>
-                    <p className="text-gray-600 text-sm">{error}</p>
-                </div>
-            </main>
-        );
-    }
-
-    if (loading || !stats) {
-        return (
-            <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-                <div className="w-12 h-12 border-4 border-[#1e4b8e] border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-[#1e4b8e] font-semibold tracking-wide">Syncing Real-Time Data...</p>
-            </main>
-        );
-    }
-
+  /* ── Error state ─────────────────────────────────────────────── */
+  if (error) {
     return (
-        <main className="min-h-screen bg-[#f0f2f5] flex flex-col">
-            <DashboardHeader availableSlots={stats.availableSlots} />
-
-            <div className="flex-1 w-full max-w-[1400px] mx-auto py-6">
-                
-                {!isMapView ? (
-                    // 1. The Volumetric Dashboard View
-                    <div className="fade-in">
-                        <ZoneSelector 
-                            zones={systemZones} 
-                            selectedZoneId={selectedZoneId}
-                            onSelectZone={setSelectedZoneId}
-                        />
-                        <ParkingGrid 
-                            zones={activeZoneData} 
-                            onViewMap={handleViewMap}
-                        />
-                    </div>
-                ) : (
-                    // 2. The Detailed Spot Map View (Parquo Style)
-                    activeZone && activeZone.isActive && (
-                        <div className="fade-in">
-                            <ParkingMap 
-                                zoneName={activeZone.name}
-                                totalSlots={activeZone.physicalCapacity}
-                                occupiedSlots={safeOccupied} 
-                                onBack={handleBackToDashboard}
-                            />
-                        </div>
-                    )
-                )}
-                
-            </div>
-
-            <footer className="mt-auto py-8 text-center text-gray-500">
-                <p className="text-xs font-medium tracking-wide">
-                    Last updated: {new Date(stats.lastUpdated).toLocaleTimeString()}
-                </p>
-            </footer>
-        </main>
+      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4">
+        <div className="bg-white border border-red-200 rounded-xl p-6 shadow-sm max-w-sm w-full text-center">
+          <p className="text-2xl mb-2">⚠️</p>
+          <h2 className="text-red-700 font-bold mb-1">Firestore Connection Error</h2>
+          <p className="text-gray-500 text-sm">{error}</p>
+          <p className="text-gray-400 text-xs mt-3">
+            Check that Firebase is configured in <code>.env.local</code> and Firestore security rules allow reads.
+          </p>
+        </div>
+      </main>
     );
+  }
+
+  /* ── Loading state ───────────────────────────────────────────── */
+  if (loading || !stats) {
+    return (
+      <main className="min-h-screen bg-[#f3f4f6] flex flex-col items-center justify-center gap-3 p-4">
+        <span className="w-10 h-10 border-4 border-[#1e4b8e] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Connecting to live data…</p>
+      </main>
+    );
+  }
+
+  /* ── Dashboard ───────────────────────────────────────────────── */
+  return (
+    <div className="min-h-screen bg-[#f3f4f6] flex flex-col">
+      <DashboardHeader lastUpdated={stats.lastUpdated} />
+
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col gap-5 fade-up">
+
+        {/* Row 1: Summary cards */}
+        <SummaryCards
+          available={stats.availableSlots}
+          occupied={stats.currentOccupied}
+          total={stats.totalCapacity}
+          status={stats.status}
+        />
+
+        {/* Row 2: Occupancy grid + Side panel */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          {/* Occupancy grid — takes 2/3 width on desktop */}
+          <div className="lg:col-span-2 flex flex-col gap-5">
+            <OccupancyGrid
+              total={stats.totalCapacity}
+              occupied={stats.currentOccupied}
+            />
+          </div>
+
+          {/* Side panel — Manual correction + Recent events */}
+          <div className="flex flex-col gap-5">
+            <ManualCorrection
+              currentOccupied={stats.currentOccupied}
+              onSuccess={refetchEvents}
+            />
+          </div>
+        </div>
+
+        {/* Row 3: Recent events full-width */}
+        <RecentEvents
+          events={events}
+          loading={eventsLoading}
+          error={eventsError}
+        />
+
+        {/* Row 4: Prototype info (collapsible) */}
+        <PrototypeInfo />
+      </main>
+
+      <footer className="py-5 text-center text-xs text-gray-400 border-t border-gray-200 mt-auto">
+        MMU Smart Parking System&nbsp;·&nbsp;FYP Prototype&nbsp;·&nbsp;
+        Capacity: {stats.totalCapacity} lots
+      </footer>
+    </div>
+  );
 }
