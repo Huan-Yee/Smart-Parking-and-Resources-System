@@ -11,12 +11,14 @@ async function bootstrap() {
   // Global Validation Pipe (The Category Checker Gate)
   // - whitelist: strips any unknown properties not in the DTO
   // - transform: auto-converts payload types to match DTO definitions
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
   // Listen on Port 5001 (Port 5000 conflicts with macOS machine)
   await app.listen(process.env.PORT ?? 5001);
 }
-bootstrap();
+void bootstrap();

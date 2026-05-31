@@ -1,109 +1,213 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# MMU Smart Parking System — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS REST API backend for the MMU Smart Parking System FYP prototype.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Overview
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+This backend receives parking events from the CV Engine (running on a laptop connected to ESP32-CAM devices), stores them in Firebase Firestore, maintains a live occupancy count, and exposes API endpoints for the Next.js admin dashboard.
 
-## Project setup
-
-```bash
-$ npm install
+```
+ESP32-CAM (entry) ──┐
+                     ├──▶  CV Engine (Python/OpenCV)  ──▶  NestJS Backend  ──▶  Firestore
+ESP32-CAM (exit)  ──┘                                              │
+                                                                    ▼
+                                                       Next.js Admin Dashboard
 ```
 
-## Firebase Database Setup (Required)
+### Prototype Scope
 
-To run this backend locally, you must provide your own Firebase Service Account key. **Do not commit this key to version control.**
+| Parameter | Value |
+|---|---|
+| Parking lots | **10** (defined in `src/config/parking.config.ts`) |
+| Route type | One-way |
+| Entry camera | ESP32-CAM #1 |
+| Exit camera | ESP32-CAM #2 |
+| License plate recognition | **Not implemented** — ESP32-CAM QVGA resolution is insufficient for ALPR. The CV engine sends `"DETECTED_CAR"` as a generic label. ALPR is documented as a future improvement for higher-resolution cameras or edge AI hardware. |
 
-1. Go to your [Firebase Console](https://console.firebase.google.com/).
-2. Navigate to **Project Settings > Service Accounts**.
-3. Click **Generate New Private Key**.
-4. Save the downloaded JSON file in the root of the `/backend` directory and name it exactly: `firebase-service-account.json`.
+---
 
-*(Note: The `.gitignore` file is configured to ignore `firebase-service-account.json` to keep your credentials secure).*
+## API Endpoints
 
-## Compile and run the project
+### Health Check
 
-```bash
-# development
-$ npm run start
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/` | Returns backend service status and timestamp |
 
-# watch mode
-$ npm run start:dev
+### Events (called by the CV Engine)
 
-# production mode
-$ npm run start:prod
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/events/entry` | Record a vehicle entry — increments occupied count |
+| `POST` | `/events/exit` | Record a vehicle exit — decrements occupied count |
+| `POST` | `/events/snapshot` | *(Stub)* Receive an ESP32-CAM image frame — future use |
+
+### Stats & History (consumed by the Next.js dashboard)
+
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/events/stats` | Live occupancy: `{ occupied, total, available, lastUpdated }` |
+| `GET` | `/events/history?limit=N` | Recent events, newest first (default 20) |
+
+### Admin
+
+| Method | Route | Description |
+|---|---|---|
+| `POST` | `/events/set-count` | Manually override occupied count (use when CV count drifts) |
+
+---
+
+## Request / Response Examples
+
+### POST /events/entry
+
+**Request body** (sent by CV Engine):
+```json
+{
+  "licensePlate": "DETECTED_CAR",
+  "entryTime": 1748675060.123
+}
 ```
 
-## Run tests
+> `entryTime` is the backward-compatible alias sent by the current CV engine.
+> New integrations should use `timestamp` instead. The backend resolves event
+> time as: `timestamp ?? entryTime ?? server time`.
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+**Response (success)**:
+```json
+{
+  "status": "success",
+  "message": "Vehicle DETECTED_CAR entry recorded.",
+  "occupied": 3,
+  "total": 10,
+  "timestamp": "2026-05-31T09:00:00.000Z"
+}
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+**Response (lot full)**:
+```json
+{
+  "statusCode": 400,
+  "message": "Parking lot is full (10/10)."
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### GET /events/stats
 
-## Resources
+```json
+{
+  "occupied": 3,
+  "total": 10,
+  "available": 7,
+  "lastUpdated": { "_seconds": 1748675060, "_nanoseconds": 0 }
+}
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### POST /events/set-count
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```json
+{ "occupied": 5 }
+```
 
-## Support
+Response:
+```json
+{
+  "status": "success",
+  "message": "Occupied count set to 5.",
+  "occupied": 5,
+  "total": 10,
+  "available": 5
+}
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+## Firebase Setup
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. Go to [Firebase Console](https://console.firebase.google.com/).
+2. Navigate to **Project Settings → Service Accounts**.
+3. Click **Generate New Private Key** and download the JSON file.
+4. Save it at `backend/firebase-service-account.json`.
 
-## License
+> ⚠️ **Never commit this file.** It is in `.gitignore`.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Firestore Collections
+
+| Collection | Document | Purpose |
+|---|---|---|
+| `events` | (auto-ID) | Individual entry/exit event records |
+| `live_counts` | `summary` | Live occupancy counter (`occupied`, `lastUpdated`) |
+
+---
+
+## Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Backend listen port | `5001` |
+| `FIREBASE_SERVICE_ACCOUNT` | JSON string of service account (cloud deployment alternative to the file) | — |
+
+> **Port note:** The CV engine (`cv-engine/config.py`) defaults to port `5000`. Update `BACKEND_URL` in `config.py` to `http://localhost:5001` (or your machine's LAN IP) before running the full system.
+
+---
+
+## Running Locally
+
+```bash
+# Install dependencies
+npm install
+
+# Development (watch mode)
+npm run start:dev
+
+# Production
+npm run build
+npm run start:prod
+```
+
+The backend listens on **http://localhost:5001** by default.
+
+---
+
+## Lint & Build
+
+```bash
+# TypeScript compile check
+npm run build
+
+# ESLint + Prettier
+npm run lint
+
+# Format source files
+npm run format
+```
+
+---
+
+## Prototype Capacity
+
+Capacity is configured in a single file:
+
+```
+backend/src/config/parking.config.ts
+```
+
+```typescript
+export const PARKING_CONFIG = {
+  TOTAL_LOTS: 10,      // ← change this to resize the prototype
+  DEFAULT_ZONE: 'gate-main',
+} as const;
+```
+
+All capacity checks, stats calculations, and DTO validators reference `PARKING_CONFIG.TOTAL_LOTS`. No other file hardcodes the capacity number.
+
+---
+
+## Future Improvements
+
+- **ALPR (License Plate Recognition):** Replace the generic `DETECTED_CAR` label with real plate text using a higher-resolution camera (e.g., ESP32-S3 Eye with AI acceleration) or cloud-side OCR on uploaded frames via the `/events/snapshot` stub.
+- **Snapshot persistence:** Store ESP32-CAM frames in Firebase Storage and link them to events.
+- **Authentication:** Add API key or JWT guard to the admin endpoints before production deployment.
+- **Multi-zone support:** The `zoneId` field is already captured per event; extend stats to break occupancy down by zone.

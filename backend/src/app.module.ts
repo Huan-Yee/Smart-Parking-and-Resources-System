@@ -6,10 +6,10 @@ import { FirebaseModule } from './firebase/firebase.module';
 
 @Module({
   imports: [
-    FirebaseModule, // Global - provides FirebaseService to all modules
-    EventsModule,
+    FirebaseModule, // Global — provides FirebaseService to all modules
+    EventsModule, // Registers /events/* routes
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

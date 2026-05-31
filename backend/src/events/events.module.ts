@@ -9,4 +9,4 @@ import { FirebaseModule } from '../firebase/firebase.module';
   providers: [EventsService],
   exports: [EventsService],
 })
-export class EventsModule { }
+export class EventsModule {}
