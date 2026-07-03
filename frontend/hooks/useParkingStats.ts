@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { doc, onSnapshot, DocumentData } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchStats } from '../lib/api';
 import { PARKING_CONFIG, deriveStatus, OccupancyStatus } from '../lib/parking.config';
 
 export interface ParkingStats {
@@ -11,44 +10,47 @@ export interface ParkingStats {
   lastUpdated: string; // ISO string
 }
 
+const POLL_INTERVAL_MS = 5_000; // poll backend every 5 seconds
+
 export function useParkingStats() {
   const [stats, setStats] = useState<ParkingStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    const docRef = doc(db, 'live_counts', 'summary');
+  const fetchAndSet = useCallback(async () => {
+    try {
+      const data = await fetchStats();
 
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
-        const data: DocumentData = snapshot.exists() ? snapshot.data() : {};
+      const total = data.total ?? PARKING_CONFIG.TOTAL_LOTS;
+      const occupied = Math.min(Math.max(0, data.occupied ?? 0), total);
+      const available = Math.max(0, total - occupied);
 
-        // Prefer total from Firestore (backend writes it), fall back to config constant.
-        const total: number = data.total ?? PARKING_CONFIG.TOTAL_LOTS;
-        const occupied: number = Math.min(data.occupied ?? 0, total);
-        const available: number = Math.max(0, total - occupied);
-
-        setStats({
-          totalCapacity: total,
-          currentOccupied: occupied,
-          availableSlots: available,
-          status: deriveStatus(available, total),
-          lastUpdated:
-            data.lastUpdated?.toDate?.()?.toISOString() ??
-            new Date().toISOString(),
-        });
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Firestore subscription error:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
+      setStats({
+        totalCapacity: total,
+        currentOccupied: occupied,
+        availableSlots: available,
+        status: deriveStatus(available, total),
+        // Use lastUpdated from backend if present, otherwise now
+        lastUpdated: data.lastUpdated ?? new Date().toISOString(),
+      });
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load stats');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { stats, loading, error };
+  useEffect(() => {
+    fetchAndSet();
+    intervalRef.current = setInterval(fetchAndSet, POLL_INTERVAL_MS);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [fetchAndSet]);
+
+  // Expose refetch so other components (e.g. ManualCorrection) can trigger an
+  // immediate refresh without waiting for the next poll cycle.
+  return { stats, loading, error, refetch: fetchAndSet };
 }

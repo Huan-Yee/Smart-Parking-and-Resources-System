@@ -6,19 +6,44 @@ interface RecentEventsProps {
   error: string | null;
 }
 
-function formatRelativeTime(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
+/**
+ * Normalise a timestamp value that may arrive as:
+ *   - ISO string       (correctly serialised backend)
+ *   - { _seconds, _nanoseconds } (raw Firestore Timestamp leaked over JSON)
+ *   - null / undefined
+ * Returns a Date object (or null if unparseable).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseTimestamp(raw: any): Date | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Firestore Timestamp serialised as { _seconds, _nanoseconds }
+  if (typeof raw === 'object' && raw._seconds != null) {
+    return new Date(raw._seconds * 1000);
+  }
+  return null;
+}
+
+function formatRelativeTime(raw: unknown): string {
+  const date = parseTimestamp(raw);
+  if (!date) return '—';
+  const diff = Date.now() - date.getTime();
   const s = Math.floor(diff / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
-  return new Date(isoString).toLocaleDateString();
+  return date.toLocaleDateString();
 }
 
-function formatTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString([], {
+function formatTime(raw: unknown): string {
+  const date = parseTimestamp(raw);
+  if (!date) return '—';
+  return date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

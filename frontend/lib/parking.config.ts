@@ -2,12 +2,12 @@
  * Frontend Prototype Configuration
  *
  * Single source of truth for prototype constants.
- * Mirrors backend PARKING_CONFIG.TOTAL_LOTS = 10.
+ * Mirrors backend PARKING_CONFIG.TOTAL_LOTS = 4.
  * Update BACKEND_URL via .env.local:
  *   NEXT_PUBLIC_BACKEND_URL=http://localhost:5001
  */
 export const PARKING_CONFIG = {
-  TOTAL_LOTS: 10,
+  TOTAL_LOTS: 4,
   ZONE: 'gate-main',
   BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001',
 } as const;

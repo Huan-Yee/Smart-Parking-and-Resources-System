@@ -13,12 +13,36 @@ export interface ParkingEvent {
   zoneId: string;
 }
 
+export interface StatsResult {
+  occupied: number;
+  total: number;
+  available: number;
+  lastUpdated: string | null; // ISO string or null
+}
+
 export interface SetCountResult {
   status: string;
   message: string;
   occupied: number;
   total: number;
   available: number;
+}
+
+/**
+ * GET /events/stats
+ * Fetches live occupancy stats from the backend (Admin SDK → bypasses Firestore rules).
+ */
+export async function fetchStats(): Promise<StatsResult> {
+  const res = await fetch(
+    `${PARKING_CONFIG.BACKEND_URL}/events/stats`,
+    { cache: 'no-store' }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch stats (${res.status})`);
+  }
+
+  return res.json();
 }
 
 /**

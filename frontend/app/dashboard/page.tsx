@@ -10,7 +10,7 @@ import RecentEvents from './components/RecentEvents';
 import PrototypeInfo from './components/PrototypeInfo';
 
 export default function DashboardPage() {
-  const { stats, loading, error } = useParkingStats();
+  const { stats, loading, error, refetch: refetchStats } = useParkingStats();
   const { events, loading: eventsLoading, error: eventsError, refetch: refetchEvents } = useRecentEvents(8);
 
   /* ── Error state ─────────────────────────────────────────────── */
@@ -19,10 +19,10 @@ export default function DashboardPage() {
       <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4">
         <div className="bg-white border border-red-200 rounded-xl p-6 shadow-sm max-w-sm w-full text-center">
           <p className="text-2xl mb-2">⚠️</p>
-          <h2 className="text-red-700 font-bold mb-1">Firestore Connection Error</h2>
+          <h2 className="text-red-700 font-bold mb-1">Backend Connection Error</h2>
           <p className="text-gray-500 text-sm">{error}</p>
           <p className="text-gray-400 text-xs mt-3">
-            Check that Firebase is configured in <code>.env.local</code> and Firestore security rules allow reads.
+            Make sure the NestJS backend is running on port 5001.
           </p>
         </div>
       </main>
@@ -69,7 +69,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-5">
             <ManualCorrection
               currentOccupied={stats.currentOccupied}
-              onSuccess={refetchEvents}
+              onSuccess={() => { refetchStats(); refetchEvents(); }}
             />
           </div>
         </div>

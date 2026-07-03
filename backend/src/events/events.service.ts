@@ -232,7 +232,10 @@ export class EventsService {
         occupied: clamped,
         total: PARKING_CONFIG.TOTAL_LOTS,
         available: PARKING_CONFIG.TOTAL_LOTS - clamped,
-        lastUpdated: data?.lastUpdated ?? null,
+        lastUpdated:
+          data?.lastUpdated && typeof (data.lastUpdated as any).toDate === 'function'
+            ? (data.lastUpdated as any).toDate().toISOString()
+            : null,
       };
     } catch (error) {
       this.logger.error('Failed to get stats', error);
@@ -264,10 +267,22 @@ export class EventsService {
         .limit(limit)
         .get();
 
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      return snapshot.docs.map((doc) => {
+        const data = doc.data();
+        // Serialize Firestore Timestamp → ISO string so the frontend can parse it
+        // with `new Date(ev.timestamp)`. Without this, Timestamp serializes as
+        // { _seconds: N, _nanoseconds: N } which produces "Invalid Date" on the client.
+        const timestamp =
+          data.timestamp && typeof data.timestamp.toDate === 'function'
+            ? data.timestamp.toDate().toISOString()
+            : data.timestamp ?? null;
+
+        return {
+          id: doc.id,
+          ...data,
+          timestamp,
+        };
+      });
     } catch (error) {
       this.logger.error('Failed to get history', error);
       return [];
