@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend — MMU Smart Parking System
 
-## Getting Started
+Next.js (App Router) admin dashboard showing live parking occupancy, recent entry/exit events, and operator controls.
 
-First, run the development server:
+## What it does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Occupancy overview** — live slot grid (occupied/available) driven by backend state
+- **Summary cards** — current count, capacity, last-updated timestamp
+- **Recent events** — rolling entry/exit detection log
+- **Manual correction** — operators can override the occupancy count when detection drifts (calls `POST /events/set-count`); the system treats CV imperfection as a first-class concern
+- **Prototype info** — explains the 4-slot, entry/exit-camera setup to viewers
+
+## Structure
+
+```
+app/
+  dashboard/
+    page.tsx                  # Dashboard route
+    components/
+      DashboardHeader.tsx
+      SummaryCards.tsx
+      OccupancyGrid.tsx       # Live slot visualisation
+      RecentEvents.tsx        # Entry/exit event log
+      ManualCorrection.tsx    # Operator count override
+      PrototypeInfo.tsx
+hooks/
+  useParkingStats.ts          # Polls backend for occupancy state
+  useRecentEvents.ts          # Polls backend for event history
+lib/
+  api.ts                      # Backend API client
+  parking.config.ts           # Zone/capacity configuration
+  firebase.ts                 # Firebase client config
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+State comes from the NestJS backend via API polling (migrated from direct Firestore listeners to centralize state ownership — see root README, "Engineering decisions").
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev        # http://localhost:3000/dashboard
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Requires the [backend](../backend/) running on port 5000/5001 and Firebase keys in `.env.local`.
